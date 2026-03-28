@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "compound-finance": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp-server.ts"],
+      "cwd": "."
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cf",
+  "description": "Compound Finance — AI-powered investment research, thesis building, and paper trading with insider signal scoring. Each trade makes the next one smarter.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Marcus Lindblom",
+    "url": "https://github.com/marcuslindblom"
+  },
+  "repository": "https://github.com/marcuslindblom/compound-finance",
+  "license": "MIT"
+}

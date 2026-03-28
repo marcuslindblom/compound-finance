@@ -1,0 +1,18 @@
+{
+  "mode": "simulation",
+  "startDate": "2026-03-28",
+  "startCapital": 1000000,
+  "cash": 1000000,
+  "positions": [],
+  "closedTrades": [],
+  "stats": {
+    "totalValue": 1000000,
+    "returnPercent": 0,
+    "totalTrades": 0,
+    "winRate": null,
+    "avgReturn": null,
+    "maxDrawdown": 0,
+    "sharpeRatio": null,
+    "benchmarkReturn": 0
+  }
+}
