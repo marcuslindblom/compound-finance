@@ -1,9 +1,11 @@
 {
   "mcpServers": {
     "compound-finance": {
-      "command": "npx",
-      "args": ["tsx", "src/mcp-server.ts"],
-      "cwd": "."
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/mcp-server.js"],
+      "env": {
+        "CLAUDE_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+      }
     }
   }
 }
