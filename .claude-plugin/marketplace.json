@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "compound-finance",
-      "source": ".",
+      "source": "./plugins/compound-finance",
       "description": "Compound Finance — each trade makes the next one smarter. Insider signals, multi-agent analysis, paper trading simulation.",
       "version": "0.1.0",
       "author": {
