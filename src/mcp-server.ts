@@ -143,7 +143,7 @@ server.tool(
         minValueSEK: params.minValueSEK,
       });
 
-      const scored = scoreAndRank(trades);
+      const scored = await scoreAndRank(trades);
       const minScore = params.minScore ?? 5;
       const notable = scored.filter((s) => s.totalScore >= minScore);
 
@@ -304,7 +304,7 @@ server.tool(
                 .toISOString()
                 .split("T")[0],
             });
-            const scored = scoreAndRank(trades);
+            const scored = await scoreAndRank(trades);
             results.push({
               company: company.name,
               tradesLast30Days: trades.length,
