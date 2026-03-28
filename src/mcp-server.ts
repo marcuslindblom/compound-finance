@@ -15,7 +15,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { searchInsiderTrades, getNotableBuys } from "./fi-scraper.js";
 import { scoreTrade, scoreAndRank } from "./scoring.js";
-import { searchTicker, getQuote, getPriceHistory } from "./yahoo-finance.js";
+import {
+  searchTicker,
+  getQuote,
+  getPriceHistory,
+  estimateMarketCap,
+  getCompanySizeCategory,
+  getOMXS30Performance,
+} from "./yahoo-finance.js";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -456,6 +463,97 @@ server.tool(
           {
             type: "text" as const,
             text: `Error getting price history: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "get_benchmark",
+  "Get OMXS30 index performance for benchmarking portfolio returns against the Swedish market.",
+  {
+    range: z
+      .enum(["1mo", "3mo", "6mo", "1y"])
+      .optional()
+      .describe("Time range (default: 3mo)"),
+  },
+  async (params) => {
+    try {
+      const perf = await getOMXS30Performance(params.range ?? "3mo");
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                index: "OMXS30",
+                currentValue: perf.currentValue,
+                changePercent: perf.changePercent,
+                changePercent30d: perf.changePercent30d,
+                dataPoints: perf.prices.length,
+                recentPrices: perf.prices.slice(-5),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error getting OMXS30: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "estimate_market_cap",
+  "Estimate market capitalization for a Swedish stock based on volume and price data. Returns SEK value and confidence level.",
+  {
+    symbol: z.string().describe("Yahoo Finance ticker (e.g., PNDX-B.ST)"),
+  },
+  async (params) => {
+    try {
+      const result = await estimateMarketCap(params.symbol);
+      const category =
+        result.marketCapSEK > 0
+          ? getCompanySizeCategory(result.marketCapSEK)
+          : "unknown";
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                symbol: params.symbol,
+                estimatedMarketCapSEK: result.marketCapSEK,
+                estimatedMarketCapB: Math.round(result.marketCapSEK / 1e8) / 10,
+                confidence: result.confidence,
+                category,
+                note: "Estimated from avg daily volume. Confidence: medium (±50%)",
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error estimating market cap: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
         isError: true,

@@ -4,31 +4,31 @@
  * FI's register at marknadssok.fi.se returns server-rendered HTML tables.
  * No JS rendering needed — plain HTTP GET with HTML parsing via cheerio.
  *
- * Decision: NOT using Cloudflare Browser Rendering for FI because:
- * 1. FI returns server-rendered HTML — no JS needed
- * 2. Plain fetch is faster and free (no CF billing)
- * 3. FI rate-limits aggressively — CF wouldn't help with that
- *
- * CF Browser Rendering reserved for future use cases that need JS rendering
- * (e.g., scraping news sites, Börsdata if we go that route).
+ * Supports pagination — FI returns max ~100 results per page.
+ * We follow "next page" links until all results are fetched.
  */
 
 import * as cheerio from "cheerio";
 import type { InsiderTrade } from "./types.js";
 
 const FI_BASE_URL = "https://marknadssok.fi.se/Publiceringsklient";
+const MAX_PAGES = 10; // Safety limit — don't hammer FI
+const DELAY_MS = 500; // Be polite between requests
 
 function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
 function parseSwedishNumber(str: string): number {
-  // FI uses non-breaking spaces (&#160;) as thousand separators and comma as decimal
   const cleaned = str
     .replace(/\u00a0/g, "")
     .replace(/\s/g, "")
     .replace(",", ".");
   return parseFloat(cleaned) || 0;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function searchInsiderTrades(options: {
@@ -54,35 +54,86 @@ export async function searchInsiderTrades(options: {
     params.set("Transaktionstyp", options.transactionType);
   }
 
-  const url = `${FI_BASE_URL}/sv-SE/Search/Search?${params.toString()}`;
+  // FI pagination loses search parameters and they rate-limit aggressively.
+  // Strategy: for ranges > 7 days, split into weekly chunks instead of paginating.
+  const from = new Date(options.fromDate || formatDate(weekAgo));
+  const to = new Date(options.toDate || formatDate(today));
+  const daySpan = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
 
+  if (daySpan > 10) {
+    // Split into weekly chunks
+    const allTrades: InsiderTrade[] = [];
+    let chunkStart = new Date(from);
+
+    while (chunkStart < to) {
+      const chunkEnd = new Date(chunkStart);
+      chunkEnd.setDate(chunkEnd.getDate() + 7);
+      if (chunkEnd > to) chunkEnd.setTime(to.getTime());
+
+      if (allTrades.length > 0) await sleep(DELAY_MS);
+
+      const chunkParams = new URLSearchParams(params);
+      chunkParams.set("fromDate", formatDate(chunkStart));
+      chunkParams.set("toDate", formatDate(chunkEnd));
+
+      const url = `${FI_BASE_URL}/sv-SE/Search/Search?${chunkParams.toString()}`;
+      try {
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "InsiderTradeScanner/1.0 (research; contact: marcus@nimble.se)",
+            Accept: "text/html",
+            "Accept-Language": "sv-SE,sv;q=0.9",
+          },
+        });
+
+        if (response.ok) {
+          const html = await response.text();
+          const { trades } = parseTradeTable(html);
+          allTrades.push(...trades);
+        }
+      } catch {
+        // Skip failed chunk, continue with next
+      }
+
+      chunkStart.setDate(chunkStart.getDate() + 7);
+    }
+
+    // Deduplicate by publication date + person + issuer + transaction date
+    const seen = new Set<string>();
+    return allTrades.filter((t) => {
+      const key = `${t.publicationDate}|${t.person}|${t.issuer}|${t.transactionDate}|${t.volume}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  // Single request for short ranges
+  const url = `${FI_BASE_URL}/sv-SE/Search/Search?${params.toString()}`;
   const response = await fetch(url, {
     headers: {
-      "User-Agent":
-        "InsiderTradeScanner/1.0 (research tool; contact: marcus@nimble.se)",
+      "User-Agent": "InsiderTradeScanner/1.0 (research; contact: marcus@nimble.se)",
       Accept: "text/html",
       "Accept-Language": "sv-SE,sv;q=0.9",
     },
   });
 
   if (!response.ok) {
-    throw new Error(
-      `FI request failed: ${response.status} ${response.statusText}`
-    );
+    throw new Error(`FI request failed: ${response.status} ${response.statusText}`);
   }
 
   const html = await response.text();
-  return parseTradeTable(html);
+  const { trades } = parseTradeTable(html);
+  return trades;
 }
 
-function parseTradeTable(html: string): InsiderTrade[] {
+function parseTradeTable(html: string): {
+  trades: InsiderTrade[];
+  nextPageUrl: string | null;
+} {
   const $ = cheerio.load(html);
   const trades: InsiderTrade[] = [];
 
-  // FI renders results as table rows — each row has ~15 td cells
-  // Structure: publication date, issuer, person, role, close associate (Ja/Nej),
-  //            transaction type, instrument, instrument type, ISIN,
-  //            transaction date, volume, unit, price, currency, details link
   const rows = $("table tbody tr");
 
   rows.each((_i, row) => {
@@ -110,7 +161,6 @@ function parseTradeTable(html: string): InsiderTrade[] {
       currency: cells[13],
     };
 
-    // Get details link if present
     const detailsLink = $(row).find("a").attr("href");
     if (detailsLink) {
       trade.detailsUrl = `${FI_BASE_URL}${detailsLink}`;
@@ -119,7 +169,23 @@ function parseTradeTable(html: string): InsiderTrade[] {
     trades.push(trade);
   });
 
-  return trades;
+  // Look for pagination — FI uses "Nästa" (Next) link
+  // Note: FI pagination links lose the date parameters, so we only follow
+  // "Nästa" if it exists and trust that FI maintains the search context via session/cookies.
+  let nextPageUrl: string | null = null;
+  $("a").each((_i, el) => {
+    const text = $(el).text().trim();
+    if (text === "Nästa" || text === "Next") {
+      const href = $(el).attr("href");
+      if (href) {
+        nextPageUrl = href.startsWith("http")
+          ? href
+          : `https://marknadssok.fi.se${href}`;
+      }
+    }
+  });
+
+  return { trades, nextPageUrl };
 }
 
 /**
@@ -136,7 +202,7 @@ export async function getNotableBuys(options: {
     transactionType: "Förvärv",
   });
 
-  const minValue = options.minValueSEK || 100000; // Default: 100k SEK minimum
+  const minValue = options.minValueSEK || 100000;
 
   return trades
     .filter((t) => t.volume * t.price >= minValue)

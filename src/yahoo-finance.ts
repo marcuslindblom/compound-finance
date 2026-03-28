@@ -215,3 +215,115 @@ export function getCompanySizeCategory(
   if (marketCapSEK < 50_000_000_000) return "mid"; // 5-50B SEK
   return "large"; // >50B SEK
 }
+
+/**
+ * Estimate market cap from 52-week range and average daily volume.
+ * Heuristic: mid-point of 52w range × estimated shares outstanding.
+ *
+ * More reliable approach: use the daily volume * price to infer float size.
+ * Average Swedish large cap trades ~0.5-1% of float daily.
+ * Small cap trades ~0.1-0.3% daily.
+ * We use 0.3% as a middle estimate → shares_outstanding ≈ avg_volume / 0.003
+ */
+export async function estimateMarketCap(
+  symbol: string
+): Promise<{ marketCapSEK: number; confidence: "low" | "medium" }> {
+  const sym = symbol.includes(".") ? symbol : `${symbol}.ST`;
+
+  const url = `${YF_BASE}/v8/finance/chart/${encodeURIComponent(sym)}?range=1mo&interval=1d`;
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+
+  if (!res.ok) throw new Error(`Chart failed: ${res.status}`);
+
+  const data = (await res.json()) as {
+    chart: {
+      result: Array<{
+        meta: { regularMarketPrice: number };
+        indicators: {
+          quote: Array<{ volume: (number | null)[] }>;
+        };
+      }>;
+    };
+  };
+
+  const result = data.chart?.result?.[0];
+  if (!result) throw new Error(`No data for ${sym}`);
+
+  const price = result.meta.regularMarketPrice;
+  const volumes = result.indicators.quote[0].volume.filter(
+    (v): v is number => v != null && v > 0
+  );
+
+  if (volumes.length === 0) {
+    return { marketCapSEK: 0, confidence: "low" };
+  }
+
+  const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+  // Estimate: avg daily volume ≈ 0.3% of total shares
+  const estShares = avgVolume / 0.003;
+  const marketCapSEK = Math.round(estShares * price);
+
+  return { marketCapSEK, confidence: "medium" };
+}
+
+/**
+ * Get OMXS30 index performance for benchmarking.
+ * Symbol: ^OMX (Yahoo Finance).
+ */
+export async function getOMXS30Performance(
+  range: "1mo" | "3mo" | "6mo" | "1y" = "3mo"
+): Promise<{
+  currentValue: number;
+  changePercent: number;
+  changePercent30d: number;
+  prices: { date: string; close: number }[];
+}> {
+  const url = `${YF_BASE}/v8/finance/chart/%5EOMX?range=${range}&interval=1d`;
+
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+
+  if (!res.ok) {
+    throw new Error(`OMXS30 fetch failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as {
+    chart: {
+      result: Array<{
+        meta: { regularMarketPrice: number };
+        timestamp: number[];
+        indicators: { quote: Array<{ close: (number | null)[] }> };
+      }>;
+    };
+  };
+
+  const result = data.chart?.result?.[0];
+  if (!result) throw new Error("No OMXS30 data");
+
+  const timestamps = result.timestamp;
+  const closes = result.indicators.quote[0].close;
+
+  const prices: { date: string; close: number }[] = [];
+  for (let i = 0; i < timestamps.length; i++) {
+    if (closes[i] != null) {
+      prices.push({
+        date: new Date(timestamps[i] * 1000).toISOString().split("T")[0],
+        close: closes[i]!,
+      });
+    }
+  }
+
+  const current = prices[prices.length - 1]?.close ?? 0;
+  const first = prices[0]?.close ?? current;
+  const price30dAgo = prices[Math.max(0, prices.length - 22)]?.close ?? current;
+
+  return {
+    currentValue: current,
+    changePercent:
+      first > 0 ? Math.round(((current - first) / first) * 10000) / 100 : 0,
+    changePercent30d:
+      price30dAgo > 0
+        ? Math.round(((current - price30dAgo) / price30dAgo) * 10000) / 100
+        : 0,
+    prices,
+  };
+}

@@ -13,7 +13,7 @@ import type { InsiderTrade, TradeScore } from "./types.js";
 import {
   searchTicker,
   getPriceHistory,
-  getQuote,
+  estimateMarketCap,
   getCompanySizeCategory,
 } from "./yahoo-finance.js";
 
@@ -188,6 +188,18 @@ function buildReasoning(
     parts.push(`👥 Two insiders buying — mild cluster signal`);
   }
 
+  if (ctx.contraTrend >= 2) {
+    parts.push(`📉 Strong contra-trend — buying while stock down >10%`);
+  } else if (ctx.contraTrend >= 1) {
+    parts.push(`📉 Mild contra-trend — buying while stock down 5-10%`);
+  }
+
+  if (ctx.companySizeBonus >= 0.75) {
+    parts.push(`🏢 Small/micro cap — insider signals are stronger`);
+  } else if (ctx.companySizeBonus >= 0.5) {
+    parts.push(`🏢 Mid cap — moderate insider edge`);
+  }
+
   return parts.join("\n");
 }
 
@@ -216,17 +228,19 @@ async function enrichWithStockData(
   if (history.changePercent30d < -10) contraTrend = 2;
   else if (history.changePercent30d < -5) contraTrend = 1;
 
-  // Get quote for market cap
+  // Estimate market cap from volume data
   let companySizeBonus = 0;
   try {
-    const quote = await getQuote(symbol);
-    const size = getCompanySizeCategory(quote.marketCap);
-    if (size === "micro") companySizeBonus = 1;
-    else if (size === "small") companySizeBonus = 0.75;
-    else if (size === "mid") companySizeBonus = 0.5;
-    // large = 0
+    const { marketCapSEK } = await estimateMarketCap(symbol);
+    if (marketCapSEK > 0) {
+      const size = getCompanySizeCategory(marketCapSEK);
+      if (size === "micro") companySizeBonus = 1;
+      else if (size === "small") companySizeBonus = 0.75;
+      else if (size === "mid") companySizeBonus = 0.5;
+      // large = 0
+    }
   } catch {
-    // Quote failed, skip market cap scoring
+    // Market cap estimation failed, skip
   }
 
   return { contraTrend, companySizeBonus };
