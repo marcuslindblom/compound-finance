@@ -1,6 +1,7 @@
 ---
-name: thesis
+name: cf:thesis
 description: Formulate an investment thesis from research data. Defines entry/exit criteria, position sizing, and conviction level. Use after research is complete.
+argument-hint: "[research document or company name]"
 ---
 
 # Thesis

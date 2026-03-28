@@ -1,6 +1,7 @@
 ---
-name: compound
+name: cf:compound
 description: Extract learnings from closed trades and portfolio performance. Updates patterns, refines scoring weights, and generates insights. Use weekly or after closing a position.
+argument-hint: "[position to review, or empty for weekly]"
 ---
 
 # Compound
@@ -32,6 +33,7 @@ The most important skill. This is where knowledge compounds.
 ## Pattern format
 
 ```markdown
+argument-hint: "[position to review, or empty for weekly]"
 ---
 date: 2026-04-15
 type: pattern
@@ -40,6 +42,7 @@ sample_size: 5
 win_rate: 0.80
 avg_return: 12.3
 tags: [contra-trend, cfo-buy, small-cap]
+argument-hint: "[position to review, or empty for weekly]"
 ---
 
 # Contra-trend CFO Buy in Small Caps

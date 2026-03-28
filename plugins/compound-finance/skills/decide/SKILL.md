@@ -1,5 +1,5 @@
 ---
-name: decide
+name: cf:decide
 description: Execute a trade decision (buy/sell/skip) in the simulation portfolio. Documents the decision with full context. Use after a thesis has been evaluated.
 ---
 

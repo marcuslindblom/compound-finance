@@ -1,6 +1,7 @@
 ---
-name: research
+name: cf:research
 description: Scan for insider trading signals and gather stock data. Creates structured research documents. Use when you want to discover new investment opportunities or investigate a specific company.
+argument-hint: "[company name, or empty for daily scan]"
 ---
 
 # Research

@@ -1,5 +1,5 @@
 ---
-name: lfg
+name: cf:lfg
 description: "Let's Fucking Go — fully autonomous daily trading pipeline. Delegates to researcher, analyst, and reviewer sub-agents for independent analysis. Designed to run unattended on a schedule."
 ---
 

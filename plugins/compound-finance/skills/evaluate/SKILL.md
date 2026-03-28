@@ -1,6 +1,7 @@
 ---
-name: evaluate
+name: cf:evaluate
 description: Multi-agent evaluation of an investment thesis. The reviewer agent challenges the thesis, checks for biases, and looks for red flags. Use before making any trade decision.
+argument-hint: "[thesis document path]"
 ---
 
 # Evaluate
