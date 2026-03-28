@@ -31,9 +31,10 @@ import type { Watchlist, WatchlistEntry } from "./types.js";
 const WATCHLIST_DIR = join(homedir(), ".compound-finance");
 const WATCHLIST_PATH = join(WATCHLIST_DIR, "watchlist.json");
 
-// Portfolio path — relative to where the plugin is run from
+// Portfolio path — use CLAUDE_PLUGIN_ROOT if running as plugin, else cwd
+const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || process.cwd();
 const PORTFOLIO_PATH = join(
-  process.cwd(),
+  PLUGIN_ROOT,
   "knowledge/portfolio/sim-portfolio.json"
 );
 

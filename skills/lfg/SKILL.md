@@ -1,106 +1,79 @@
 ---
 name: lfg
-description: "Let's Fucking Go — fully autonomous daily trading pipeline. Scans insider trades, formulates theses, reviews them, executes simulation trades, checks existing positions, and compounds learnings. Designed to run unattended on a schedule."
+description: "Let's Fucking Go — fully autonomous daily trading pipeline. Delegates to researcher, analyst, and reviewer sub-agents for independent analysis. Designed to run unattended on a schedule."
 ---
 
 # LFG — Autonomous Daily Pipeline
 
-Run the full compound finance pipeline end-to-end. Zero human input required.
+Run the full compound finance pipeline end-to-end. Delegates to specialized sub-agents for each phase.
 
 ## Instructions
 
-Execute these steps in order. Log everything. If any step fails, continue with the next — don't abort the pipeline.
+### Step 1: Research (delegate to `researcher` agent)
 
-### Step 1: Scan (Researcher)
+Delegate to the **researcher** sub-agent with this task:
+> Scan FI's insider trading register for notable trades from the last 7 days. Use `scan_notable_trades` with minScore 6. For each trade found, also fetch stock quote and price history. Report all findings structured with: issuer, person, role, transaction details, score, price trend, and market cap estimate.
 
-1. Use `scan_notable_trades` with default date range (last 7 days)
-2. Filter to trades with score >= 6
-3. For each notable trade, check if research already exists in `knowledge/research/`
-4. If new: write a research document using the template at `templates/research.md`
-5. Summary: "Found X trades, Y new signals"
+Save the researcher's findings to `knowledge/research/YYYY-MM-DD-daily-scan.md` using the template.
 
-### Step 2: Thesis (Analyst)
+### Step 2: Thesis (delegate to `analyst` agent)
 
-1. For each new research document with score >= 7:
-   - Check `knowledge/patterns/` for similar historical patterns
-   - Formulate a thesis using the template at `templates/thesis.md`
-   - Set conviction based on score + pattern match
-2. Skip if score 6 — not enough conviction for autonomous trading
-3. Summary: "Created X new theses"
+For each research finding with score >= 7, delegate to the **analyst** sub-agent:
+> Given this research data: [paste researcher findings]. Check knowledge/patterns/ for historical precedent. Formulate an investment thesis with entry price, target, stop-loss, time horizon, position size (max 10%), and conviction level. If no similar pattern exists, set conviction to LOW.
 
-### Step 3: Review (Reviewer)
+Save each thesis to `knowledge/theses/YYYY-MM-DD-{company}-{signal}.md` using the template.
 
-1. For each new thesis:
-   - Run the reviewer's red flag checklist
-   - Check `knowledge/archive/` for similar failed trades
-   - Run cognitive bias check
-   - Append `## Review` section to the thesis document
-   - Set verdict: PROCEED / CAUTION / REJECT
-2. Summary: "X proceed, Y caution, Z rejected"
+### Step 3: Review (delegate to `reviewer` agent)
 
-### Step 4: Execute (Decide)
+For each new thesis, delegate to the **reviewer** sub-agent:
+> Review this investment thesis: [paste thesis]. Challenge the bull case. Find the strongest bear case. Check for cognitive biases. Check knowledge/archive/ for similar trades that failed. Give verdict: PROCEED, CAUTION, or REJECT.
 
-1. For each thesis with verdict PROCEED or CAUTION:
-   - Read portfolio via `get_portfolio`
-   - PROCEED: use thesis position size (max 10%)
-   - CAUTION: halve the position size (max 5%)
-   - Check sector exposure (max 30% per sector)
-   - Execute via `execute_sim_trade` with stop-loss and target from thesis
-   - Write decision document using the template at `templates/decision.md`
-2. Summary: "Executed X sim trades, invested Y SEK"
+Append the review to the thesis document under a `## Review` section.
+
+### Step 4: Execute
+
+For each thesis with verdict PROCEED or CAUTION (do NOT delegate — handle directly):
+1. Read portfolio via `get_portfolio`
+2. PROCEED: use thesis position size (max 10%)
+3. CAUTION: halve the position size (max 5%)
+4. Check sector exposure (max 30% per sector)
+5. Execute via `execute_sim_trade`
+6. Write decision document to `knowledge/decisions/`
 
 ### Step 5: Position Check
 
-1. Read current portfolio via `get_portfolio`
-2. For each open position:
-   - Get current price via `get_stock_quote`
-   - **Stop-loss hit?** → sell, move to archive, log loss
-   - **Target hit?** → sell, move to archive, log win
-   - **Time horizon expired?** → review thesis, consider closing
-   - **New insider activity?** → note in thesis
-3. Summary: "X positions checked, Y closed (W wins, L losses)"
+For each open position in the portfolio:
+1. Get current price via `get_stock_quote`
+2. **Stop-loss hit?** → sell via `execute_sim_trade`, archive
+3. **Target hit?** → sell, archive
+4. **Time horizon expired?** → review thesis, consider closing
 
-### Step 6: Portfolio Update
+### Step 6: Report
 
-1. Update `knowledge/portfolio/sim-portfolio.json` with current prices
-2. Calculate total portfolio value
-3. Update stats: return %, win rate, avg return
-
-### Step 7: Report
-
-Generate a concise daily report:
-
+Generate a daily summary:
 ```
 📊 Compound Finance — YYYY-MM-DD
 
-Portfölj: X SEK (±Y.Z% sedan start)
-Cash: X SEK | Positioner: N st
+Portfolio: X SEK (±Y.Z% since start)
+Cash: X SEK | Positions: N
 
-Nya signaler: X (score >= 6)
-Nya theses: X
-Köpta: X | Sålda: X | Skippade: X
+New signals: X (score >= 6)
+New theses: X  
+Bought: X | Sold: X | Skipped: X
 
-Bästa signal: {company} — {person} ({role}), score X/10
-Portfölj idag: ±X.Z% | OMXS30: ±X.Z%
+Top signal: {company} — {person} ({role}), score X/10
+Portfolio today: ±X.Z% | OMXS30: ±X.Z%
 ```
 
-### Step 8: Compound (if Friday)
+### Step 7: Compound (Fridays only)
 
-If today is Friday (or `$ARGUMENTS` contains "compound"):
-1. Run weekly review
-2. Compare week's trades vs thesis predictions
-3. Extract any new patterns → `knowledge/patterns/`
-4. Save review to `knowledge/reviews/YYYY-WXX-weekly.md`
-5. Check score accuracy: do high-score trades outperform?
-
-## Scheduling
-
-This skill is designed to run as a Claude Code scheduled task:
-- Daily at 07:30 CET (after market data is refreshed)
-- Friday run includes the compound step automatically
+If today is Friday or `$ARGUMENTS` contains "compound":
+1. Review closed trades vs thesis predictions
+2. Extract patterns → `knowledge/patterns/`
+3. Save review to `knowledge/reviews/`
+4. Check score accuracy
 
 ## Safety
 
-- ALL trades execute in simulation mode only
-- No `--live` flag support in LFG — autonomous = sim only
-- Human must explicitly use `/cf:decide --live` for real trades
+- ALL trades execute in simulation mode — no exceptions
+- Live trading requires manual `/cf:decide --live`

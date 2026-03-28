@@ -1,0 +1,24 @@
+{
+  "name": "compound-finance",
+  "owner": {
+    "name": "Marcus Lindblom",
+    "email": "marcus@nimble.se"
+  },
+  "metadata": {
+    "description": "AI-powered investment research, thesis building, and paper trading with Swedish insider signal scoring",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "compound-finance",
+      "source": ".",
+      "description": "Compound Finance — each trade makes the next one smarter. Insider signals, multi-agent analysis, paper trading simulation.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Marcus Lindblom"
+      },
+      "keywords": ["finance", "trading", "insider", "research", "swedish-stocks"],
+      "category": "finance"
+    }
+  ]
+}
