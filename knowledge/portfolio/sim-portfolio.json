@@ -1,0 +1,33 @@
+{
+  "mode": "simulation",
+  "startDate": "2026-03-28",
+  "startCapital": 1000000,
+  "cash": 985019,
+  "positions": [
+    {
+      "symbol": "LINC.ST",
+      "name": "Linc AB",
+      "shares": 211,
+      "entryPrice": 71,
+      "entryDate": "2026-03-31",
+      "currentPrice": 71,
+      "stopLoss": 61.5,
+      "target": 79,
+      "thesis": "knowledge/theses/2026-03-31-linc-ceo-buy.md",
+      "verdict": "CAUTION",
+      "positionSize": 0.015,
+      "costBasis": 14981
+    }
+  ],
+  "closedTrades": [],
+  "stats": {
+    "totalValue": 1000000,
+    "returnPercent": 0,
+    "totalTrades": 1,
+    "winRate": null,
+    "avgReturn": null,
+    "maxDrawdown": 0,
+    "sharpeRatio": null,
+    "benchmarkReturn": 0
+  }
+}
