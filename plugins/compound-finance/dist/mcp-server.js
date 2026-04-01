@@ -17,11 +17,11 @@ import { searchTicker, getQuote, getPriceHistory, estimateMarketCap, getCompanyS
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-const WATCHLIST_DIR = join(homedir(), ".compound-finance");
+const COMPOUND_HOME = join(homedir(), ".compound-finance");
+const WATCHLIST_DIR = COMPOUND_HOME;
 const WATCHLIST_PATH = join(WATCHLIST_DIR, "watchlist.json");
-// Portfolio path — use CLAUDE_PLUGIN_ROOT if running as plugin, else cwd
-const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || process.cwd();
-const PORTFOLIO_PATH = join(PLUGIN_ROOT, "knowledge/portfolio/sim-portfolio.json");
+// Portfolio path — stable location under ~/.compound-finance/
+const PORTFOLIO_PATH = join(COMPOUND_HOME, "sim-portfolio.json");
 // --- Watchlist helpers ---
 function loadWatchlist() {
     try {
@@ -474,6 +474,7 @@ function loadPortfolio() {
     };
 }
 function savePortfolio(p) {
+    mkdirSync(COMPOUND_HOME, { recursive: true });
     writeFileSync(PORTFOLIO_PATH, JSON.stringify(p, null, 2));
 }
 server.tool("get_portfolio", "Get the current simulation portfolio state including cash, positions, closed trades, and performance stats.", {}, async () => {
