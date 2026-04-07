@@ -10,7 +10,7 @@
       "shares": 211,
       "entryPrice": 71,
       "entryDate": "2026-03-31",
-      "currentPrice": 71,
+      "currentPrice": 72.3,
       "stopLoss": 61.5,
       "target": 79,
       "thesis": "knowledge/theses/2026-03-31-linc-ceo-buy.md",
@@ -21,13 +21,13 @@
   ],
   "closedTrades": [],
   "stats": {
-    "totalValue": 1000000,
-    "returnPercent": 0,
+    "totalValue": 1000274,
+    "returnPercent": 0.03,
     "totalTrades": 1,
     "winRate": null,
     "avgReturn": null,
     "maxDrawdown": 0,
     "sharpeRatio": null,
-    "benchmarkReturn": 0
+    "benchmarkReturn": 4.48
   }
 }
